@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Modes Atelier</title>
+<style>
+:root { --bg: #0f0f12; --fg: #e8e6e3; --accent: #c9a86c; --key: #222; --key-white: #f5f5f5; --highlight: #d4af37; }
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--fg); line-height: 1.5; }
+header { padding: 1.5rem; text-align: center; border-bottom: 1px solid #333; }
+h1 { margin: 0 0 0.5rem; font-weight: 500; }
+.lang { margin-top: 0.5rem; }
+.lang button { background: transparent; border: 1px solid #555; color: var(--fg); padding: 0.3rem 0.6rem; margin: 0 0.2rem; cursor: pointer; border-radius: 4px; }
+.lang button.active { background: var(--accent); color: #111; border-color: var(--accent); }
+main { max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
+.controls { display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem; align-items: end; }
+label { display: block; font-size: 0.85rem; margin-bottom: 0.3rem; opacity: 0.8; }
+select, button.play { background: #1a1a1e; border: 1px solid #444; color: var(--fg); padding: 0.6rem 1rem; border-radius: 6px; font-size: 1rem; }
+button.play { background: var(--accent); color: #111; border: none; cursor: pointer; font-weight: 500; }
+button.play:hover { filter: brightness(1.1); }
+.piano { display: flex; height: 140px; margin: 2rem 0; position: relative; user-select: none; }
+.key { flex: 1; border: 1px solid #111; position: relative; cursor: pointer; }
+.key.white { background: var(--key-white); }
+.key.black { background: var(--key); width: 60%; margin: 0 -30%; z-index: 2; height: 70%; }
+.key.highlight { background: var(--highlight) !important; }
+.key.black.highlight { background: #b8860b !important; }
+.notes { background: #1a1a1e; padding: 1rem; border-radius: 8px; margin: 1rem 0; }
+.notes span { display: inline-block; margin: 0.2rem; padding: 0.3rem 0.6rem; background: #2a2a2e; border-radius: 4px; }
+footer { text-align: center; padding: 2rem; opacity: 0.6; font-size: 0.85rem; }
+@media (max-width: 600px) { .controls { flex-direction: column; align-items: stretch; } .piano { height: 100px; } }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">Modes Atelier</h1>
+  <p id="subtitle">Explorateur de modes musicaux cinématiques</p>
+  <div class="lang">
+    <button data-lang="fr" class="active">FR</button>
+    <button data-lang="en">EN</button>
+    <button data-lang="tzm">TZM</button>
+  </div>
+</header>
+<main>
+  <div class="controls">
+    <div>
+      <label id="lbl-root">Note fondamentale</label>
+      <select id="root"></select>
+    </div>
+    <div>
+      <label id="lbl-mode">Mode</label>
+      <select id="mode"></select>
+    </div>
+    <button class="play" id="play">▶ Jouer la gamme</button>
+  </div>
+  <div class="piano" id="piano"></div>
+  <div class="notes" id="notes-list"></div>
+  <p id="desc"></p>
+</main>
+<footer>MIT · 100% navigateur · Aucune donnée envoyée</footer>
+<script>
+const notes = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const modes = {
+  ionian: { name: {fr:'Ionien (majeur)', en:'Ionian (major)', tzm:'Ionien'}, intervals: [0,2,4,5,7,9,11], desc: {fr:'Mode majeur, lumineux et stable.', en:'Major mode, bright and stable.', tzm:'Amur n wudam, aḥerri d umeksa.'} },
+  dorian: { name: {fr:'Dorien', en:'Dorian', tzm:'Dorien'}, intervals: [0,2,3,5,7,9,10], desc: {fr:'Mineur avec sixte majeure. Jazz, folk, cinématique.', en:'Minor with major sixth. Jazz, folk, cinematic.', tzm:'Amẓyan s sdis ameqqran. Jazz, folk, sinima.'} },
+  phrygian: { name: {fr:'Phrygien', en:'Phrygian', tzm:'Phrygien'}, intervals: [0,1,3,5,7,8,10], desc: {fr:'Tendu, oriental, parfait pour suspense.', en:'Tense, Eastern, perfect for suspense.', tzm:'Uzzal, asurṭan, i suspense.'} },
+  lydian: { name: {fr:'Lydien', en:'Lydian', tzm:'Lydien'}, intervals: [0,2,4,6,7,9,11], desc: {fr:'Majeur avec quarte augmentée. Épique, rêveur.', en:'Major with raised fourth. Epic, dreamy.', tzm:'Ameqqran s rabɛa yettwazlen. Epic, yettḥulmu.'} },
+  mixolydian: { name: {fr:'Mixolydien', en:'Mixolydian', tzm:'Mixolydien'}, intervals: [0,2,4,5,7,9,10], desc: {fr:'Majeur avec septième mineure. Blues, rock.', en:'Major with minor seventh. Blues, rock.', tzm:'Ameqqran s sbeɛa tameẓyant. Blues, rock.'} },
+  aeolian: { name: {fr:'Éolien (mineur naturel)', en:'Aeolian (natural minor)', tzm:'Éolien'}, intervals: [0,2,3,5,7,8,10], desc: {fr:'Mineur naturel, mélancolique.', en:'Natural minor, melancholic.', tzm:'Amẓyan amagnu, d asennan.'} },
+  locrian: { name: {fr:'Locrien', en:'Locrian', tzm:'Locrien'}, intervals: [0,1,3,5,6,8,10], desc: {fr:'Très dissonant, rare, atmosphérique.', en:'Very dissonant, rare, atmospheric.', tzm:'Yettwabedden aṭas, yewɛer, d asuyas.'} }
+};
+let lang = 'fr';
+const t = {
+  title: {fr:'Modes Atelier', en:'Modes Atelier', tzm:'Modes Atelier'},
+  subtitle: {fr:'Explorateur de modes musicaux cinématiques', en:'Cinematic musical modes explorer', tzm:'Asenfaren n tɣawsiwin n uẓawan sinima'},
+  root: {fr:'Note fondamentale', en:'Root note', tzm:'Tazmilt tazadart'},
+  mode: {fr:'Mode', en:'Mode', tzm:'Aɣawas'},
+  play: {fr:'▶ Jouer la gamme', en:'▶ Play scale', tzm:'▶ Urar tagammart'},
+  footer: {fr:'MIT · 100% navigateur · Aucune donnée envoyée', en:'MIT · 100% browser · No data sent', tzm:'MIT · 100% navigateur · Ulac isefka yettwazen'}
+};
+function updateLang() {
+  document.getElementById('title').textContent = t.title[lang];
+  document.getElementById('subtitle').textContent = t.subtitle[lang];
+  document.getElementById('lbl-root').textContent = t.root[lang];
+  document.getElementById('lbl-mode').textContent = t.mode[lang];
+  document.getElementById('play').textContent = t.play[lang];
+  document.querySelector('footer').textContent = t.footer[lang];
+  document.querySelectorAll('.lang button').forEach(b => b.classList.toggle('active', b.dataset.lang === lang));
+  buildUI();
+}
+document.querySelectorAll('.lang button').forEach(btn => {
+  btn.onclick = () => { lang = btn.dataset.lang; updateLang(); };
+});
+function buildUI() {
+  const rootSel = document.getElementById('root');
+  const modeSel = document.getElementById('mode');
+  rootSel.innerHTML = notes.map(n => `<option value="${n}">${n}</option>`).join('');
+  modeSel.innerHTML = Object.keys(modes).map(k => `<option value="${k}">${modes[k].name[lang]}</option>`).join('');
+  update();
+}
+function update() {
+  const root = document.getElementById('root').value;
+  const modeKey = document.getElementById('mode').value;
+  const mode = modes[modeKey];
+  const rootIdx = notes.indexOf(root);
+  const scaleNotes = mode.intervals.map(i => notes[(rootIdx + i) % 12]);
+  document.getElementById('notes-list').innerHTML = scaleNotes.map(n => `<span>${n}</span>`).join('');
+  document.getElementById('desc').textContent = mode.desc[lang];
+  renderPiano(scaleNotes);
+}
+function renderPiano(scaleNotes) {
+  const piano = document.getElementById('piano');
+  piano.innerHTML = '';
+  notes.forEach(n => {
+    const isBlack = n.includes('#');
+    const div = document.createElement('div');
+    div.className = 'key ' + (isBlack ? 'black' : 'white') + (scaleNotes.includes(n) ? ' highlight' : '');
+    div.style.flex = isBlack ? '0.6' : '1';
+    div.onclick = () => playNote(n);
+    piano.appendChild(div);
+  });
+}
+let audioCtx;
+function playNote(noteName, duration = 0.4) {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const freq = 440 * Math.pow(2, (notes.indexOf(noteName) - 9) / 12);
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'sine';
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + duration);
+}
+document.getElementById('play').onclick = () => {
+  const root = document.getElementById('root').value;
+  const modeKey = document.getElementById('mode').value;
+  const mode = modes[modeKey];
+  const rootIdx = notes.indexOf(root);
+  const scale = mode.intervals.map(i => notes[(rootIdx + i) % 12]);
+  scale.forEach((n, i) => setTimeout(() => playNote(n, 0.35), i * 300));
+};
+document.getElementById('root').onchange = update;
+document.getElementById('mode').onchange = update;
+updateLang();
+</script>
+</body>
+</html>
